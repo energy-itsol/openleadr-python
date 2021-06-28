@@ -258,6 +258,7 @@ class ReportDescription:
 class ReportPayload:
     r_id: str
     value: float
+    oadrDataQuality: str = "Quality Good"
     confidence: int = None
     accuracy: int = None
 
