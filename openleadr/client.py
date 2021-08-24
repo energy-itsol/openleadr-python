@@ -541,7 +541,8 @@ class OpenADRClient:
         # Get the relevant variables from the report requests
         report_request_id = report_request['report_request_id']
         report_specifier_id = report_request['report_specifier']['report_specifier_id']
-        report_back_duration = report_request['report_specifier'].get('report_back_duration')
+        report_back_duration = report_request['report_specifier'].get(
+            'report_back_duration')
         granularity = report_request['report_specifier']['granularity']
 
         # Check if this report actually exists
@@ -555,14 +556,13 @@ class OpenADRClient:
             return False
 
         # for report setting dtstart, duration
-        report_interval = report_request['report_specifier'].get('report_interval')[
-            'properties']['dtstart']
-        print('report_interval' + report_interval)
+        report_interval = report_request['report_specifier'].get(
+            'report_interval')
+        logger.info("report_interval" + report_interval)
         if report_interval:
             report.dtstart = report_interval['properties']['dtstart']
         else:
             report.dtstart = datetime.now()
-        logger.info("report_interval" + report_interval)
 
         # Check and collect the requested r_ids for this report
         requested_r_ids = []
@@ -813,7 +813,7 @@ class OpenADRClient:
 
     async def _perform_request(self, service, message):
         await self._ensure_client_session()
-        logger.debug(f"Client is sending {message}")
+        logger.debug(f"Client is sending... {message}")
         url = f"{self.vtn_url}/{service}"
         try:
             async with self.client_session.post(url, data=message) as req:
@@ -823,7 +823,7 @@ class OpenADRClient:
                         f"Non-OK status {req.status} when performing a request to {url} "
                         f"with data {message}: {req.status} {content.decode('utf-8')}")
                     return None, {}
-                logger.debug(content.decode('utf-8'))
+                logger.debug('response:' + content.decode('utf-8'))
         except aiohttp.client_exceptions.ClientConnectorError as err:
             # Could not connect to server
             logger.error(
