@@ -545,11 +545,24 @@ class OpenADRClient:
         granularity = report_request['report_specifier']['granularity']
 
         # Check if this report actually exists
-        report = utils.find_by(self.reports, 'report_specifier_id', report_specifier_id)
+        report = utils.find_by(
+            self.reports,
+            'report_specifier_id',
+            report_specifier_id)
         if not report:
             logger.error(f"A non-existant report with report_specifier_id "
                          f"{report_specifier_id} was requested.")
             return False
+
+        # for report setting dtstart, duration
+        report_interval = report_request['report_specifier'].get('report_interval')[
+            'properties']['dtstart']
+        print('report_interval' + report_interval)
+        if report_interval:
+            report.dtstart = report_interval['properties']['dtstart']
+        else:
+            report.dtstart = datetime.now()
+        logger.info("report_interval" + report_interval)
 
         # Check and collect the requested r_ids for this report
         requested_r_ids = []
