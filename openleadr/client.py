@@ -28,7 +28,7 @@ from signxml.exceptions import InvalidSignature
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from openleadr import enums, objects, errors
 from openleadr.messaging import create_message, parse_message, \
-                                validate_xml_schema, validate_xml_signature
+    validate_xml_schema, validate_xml_signature
 from openleadr import utils
 
 logger = logging.getLogger('openleadr')
@@ -39,9 +39,20 @@ class OpenADRClient:
     Main client class. Most of these methods will be called automatically, but
     you can always choose to call them manually.
     """
-    def __init__(self, ven_name, vtn_url, debug=False, cert=None, key=None,
-                 passphrase=None, vtn_fingerprint=None, show_fingerprint=True, ca_file=None,
-                 allow_jitter=True, ven_id=None):
+
+    def __init__(
+            self,
+            ven_name,
+            vtn_url,
+            debug=False,
+            cert=None,
+            key=None,
+            passphrase=None,
+            vtn_fingerprint=None,
+            show_fingerprint=True,
+            ca_file=None,
+            allow_jitter=True,
+            ven_id=None):
         """
         Initializes a new OpenADR Client (Virtual End Node)
 
@@ -74,16 +85,22 @@ class OpenADRClient:
         self.debug = debug
 
         self.reports = []
-        self.report_callbacks = {}              # Holds the callbacks for each specific report
-        self.report_requests = []               # Keep track of the report requests from the VTN
-        self.incomplete_reports = {}            # Holds reports that are being populated over time
-        self.pending_reports = asyncio.Queue()  # Holds reports that are waiting to be sent
+        # Holds the callbacks for each specific report
+        self.report_callbacks = {}
+        # Keep track of the report requests from the VTN
+        self.report_requests = []
+        # Holds reports that are being populated over time
+        self.incomplete_reports = {}
+        # Holds reports that are waiting to be sent
+        self.pending_reports = asyncio.Queue()
         self.scheduler = AsyncIOScheduler()
         self.client_session = None
         self.report_queue_task = None
 
-        self.received_events = []               # Holds the events that we received.
-        self.responded_events = {}              # Holds the events that we already saw.
+        # Holds the events that we received.
+        self.received_events = []
+        # Holds the events that we already saw.
+        self.responded_events = {}
 
         self.cert_path = cert
         self.key_path = key
@@ -100,7 +117,8 @@ class OpenADRClient:
                 print("")
                 print("*" * 80)
                 print("Your VEN Certificate Fingerprint is ".center(80))
-                print(f"{utils.certificate_fingerprint(cert).center(80)}".center(80))
+                print(
+                    f"{utils.certificate_fingerprint(cert).center(80)}".center(80))
                 print("Please deliver this fingerprint to the VTN.".center(80))
                 print("You do not need to keep this a secret.".center(80))
                 print("*" * 80)
@@ -127,16 +145,20 @@ class OpenADRClient:
 
         if self.reports:
             await self.register_reports(self.reports)
-            self.report_queue_task = self.loop.create_task(self._report_queue_worker())
+            self.report_queue_task = self.loop.create_task(
+                self._report_queue_worker())
 
         await self._poll()
 
         # Set up automatic polling
         if self.poll_frequency > timedelta(hours=24):
-            logger.warning("Polling with intervals of more than 24 hours is not supported. "
-                           "Will use 24 hours as the polling interval.")
+            logger.warning(
+                "Polling with intervals of more than 24 hours is not supported. "
+                "Will use 24 hours as the polling interval.")
             self.poll_frequency = timedelta(hours=24)
-        cron_config = utils.cron_config(self.poll_frequency, randomize_seconds=self.allow_jitter)
+        cron_config = utils.cron_config(
+            self.poll_frequency,
+            randomize_seconds=self.allow_jitter)
 
         self.scheduler.add_job(self._poll,
                                trigger='cron',
@@ -162,19 +184,33 @@ class OpenADRClient:
         Add a callback for the given situation
         """
         if handler not in ('on_event', 'on_update_event'):
-            logger.error("'handler' must be either on_event or on_update_event")
+            logger.error(
+                "'handler' must be either on_event or on_update_event")
             return
 
         setattr(self, handler, callback)
 
-    def add_report(self, callback, resource_id, measurement=None,
-                   data_collection_mode='incremental',
-                   report_specifier_id=None, r_id=None,
-                   report_name=enums.REPORT_NAME.TELEMETRY_USAGE,
-                   reading_type=enums.READING_TYPE.DIRECT_READ,
-                   report_type=enums.REPORT_TYPE.READING, sampling_rate=None, data_source=None,
-                   scale="none", unit=None, power_ac=True, power_hertz=50, power_voltage=230,
-                   market_context=None, end_device_asset_mrid=None, report_data_source=None):
+    def add_report(
+            self,
+            callback,
+            resource_id,
+            measurement=None,
+            data_collection_mode='incremental',
+            report_specifier_id=None,
+            r_id=None,
+            report_name=enums.REPORT_NAME.TELEMETRY_USAGE,
+            reading_type=enums.READING_TYPE.DIRECT_READ,
+            report_type=enums.REPORT_TYPE.READING,
+            sampling_rate=None,
+            data_source=None,
+            scale="none",
+            unit=None,
+            power_ac=True,
+            power_hertz=50,
+            power_voltage=230,
+            market_context=None,
+            end_device_asset_mrid=None,
+            report_data_source=None):
         """
         Add a new reporting capability to the client.
 
@@ -215,40 +251,51 @@ class OpenADRClient:
         """
 
         # Verify input
-        if report_name not in enums.REPORT_NAME.values and not report_name.startswith('x-'):
-            raise ValueError(f"{report_name} is not a valid report_name. Valid options are "
-                             f"{', '.join(enums.REPORT_NAME.values)}",
-                             " or any name starting with 'x-'.")
-        if reading_type not in enums.READING_TYPE.values and not reading_type.startswith('x-'):
-            raise ValueError(f"{reading_type} is not a valid reading_type. Valid options are "
-                             f"{', '.join(enums.READING_TYPE.values)}"
-                             " or any name starting with 'x-'.")
-        if report_type not in enums.REPORT_TYPE.values and not report_type.startswith('x-'):
-            raise ValueError(f"{report_type} is not a valid report_type. Valid options are "
-                             f"{', '.join(enums.REPORT_TYPE.values)}"
-                             " or any name starting with 'x-'.")
+        if report_name not in enums.REPORT_NAME.values and not report_name.startswith(
+                'x-'):
+            raise ValueError(
+                f"{report_name} is not a valid report_name. Valid options are "
+                f"{', '.join(enums.REPORT_NAME.values)}",
+                " or any name starting with 'x-'.")
+        if reading_type not in enums.READING_TYPE.values and not reading_type.startswith(
+                'x-'):
+            raise ValueError(
+                f"{reading_type} is not a valid reading_type. Valid options are "
+                f"{', '.join(enums.READING_TYPE.values)}"
+                " or any name starting with 'x-'.")
+        if report_type not in enums.REPORT_TYPE.values and not report_type.startswith(
+                'x-'):
+            raise ValueError(
+                f"{report_type} is not a valid report_type. Valid options are "
+                f"{', '.join(enums.REPORT_TYPE.values)}"
+                " or any name starting with 'x-'.")
         if scale not in enums.SI_SCALE_CODE.values:
-            raise ValueError(f"{scale} is not a valid scale. Valid options are "
-                             f"{', '.join(enums.SI_SCALE_CODE.values)}")
+            raise ValueError(
+                f"{scale} is not a valid scale. Valid options are "
+                f"{', '.join(enums.SI_SCALE_CODE.values)}")
 
         if sampling_rate is None:
-            sampling_rate = objects.SamplingRate(min_period=timedelta(seconds=10),
-                                                 max_period=timedelta(hours=24),
-                                                 on_change=False)
+            sampling_rate = objects.SamplingRate(
+                min_period=timedelta(
+                    seconds=10), max_period=timedelta(
+                    hours=24), on_change=False)
         elif isinstance(sampling_rate, timedelta):
             sampling_rate = objects.SamplingRate(min_period=sampling_rate,
                                                  max_period=sampling_rate,
                                                  on_change=False)
 
         if data_collection_mode not in ('incremental', 'full'):
-            raise ValueError("The data_collection_mode should be 'incremental' or 'full'.")
+            raise ValueError(
+                "The data_collection_mode should be 'incremental' or 'full'.")
 
         if data_collection_mode == 'full':
             args = inspect.signature(callback).parameters
-            if not ('date_from' in args and 'date_to' in args and 'sampling_interval' in args):
-                raise TypeError("Your callback function must accept the 'date_from', 'date_to' "
-                                "and 'sampling_interval' arguments if used "
-                                "with data_collection_mode 'full'.")
+            if not (
+                    'date_from' in args and 'date_to' in args and 'sampling_interval' in args):
+                raise TypeError(
+                    "Your callback function must accept the 'date_from', 'date_to' "
+                    "and 'sampling_interval' arguments if used "
+                    "with data_collection_mode 'full'.")
 
         # Determine the correct item name, item description and unit
         if report_name == 'TELEMETRY_STATUS':
@@ -257,12 +304,14 @@ class OpenADRClient:
             item_base = measurement
         elif isinstance(measurement, dict):
             utils.validate_report_measurement_dict(measurement)
-            power_attributes = object.PowerAttributes(**measurement.get('power_attributes')) or None
-            item_base = objects.Measurement(name=measurement['name'],
-                                            description=measurement['description'],
-                                            unit=measurement['unit'],
-                                            scale=measurement.get('scale'),
-                                            power_attributes=power_attributes)
+            power_attributes = object.PowerAttributes(
+                **measurement.get('power_attributes')) or None
+            item_base = objects.Measurement(
+                name=measurement['name'],
+                description=measurement['description'],
+                unit=measurement['unit'],
+                scale=measurement.get('scale'),
+                power_attributes=power_attributes)
         elif measurement.upper() in enums.MEASUREMENTS.members:
             item_base = enums.MEASUREMENTS[measurement.upper()]
         else:
@@ -276,14 +325,16 @@ class OpenADRClient:
                 if scale in enums.SI_SCALE_CODE.values:
                     item_base.scale = scale
             else:
-                raise ValueError("The 'scale' argument must be one of '{'. ',join(enums.SI_SCALE_CODE.values)}")
+                raise ValueError(
+                    "The 'scale' argument must be one of '{'. ',join(enums.SI_SCALE_CODE.values)}")
 
         # Check if unit is compatible
         if unit is not None and unit != item_base.unit and unit not in item_base.acceptable_units:
-            logger.warning(f"The supplied unit {unit} for measurement {measurement} "
-                           f"will be ignored, {item_base.unit} will be used instead. "
-                           f"Allowed units for this measurement are: "
-                           f"{', '.join(item_base.acceptable_units)}")
+            logger.warning(
+                f"The supplied unit {unit} for measurement {measurement} "
+                f"will be ignored, {item_base.unit} will be used instead. "
+                f"Allowed units for this measurement are: "
+                f"{', '.join(item_base.acceptable_units)}")
 
         # Get or create the relevant Report
         if report_specifier_id:
@@ -304,14 +355,15 @@ class OpenADRClient:
         # Add the new report description to the report
         target = objects.Target(resource_id=resource_id)
         r_id = utils.generate_id()
-        report_description = objects.ReportDescription(r_id=r_id,
-                                                       reading_type=reading_type,
-                                                       report_data_source=target,
-                                                       report_subject=target,
-                                                       report_type=report_type,
-                                                       sampling_rate=sampling_rate,
-                                                       measurement=item_base,
-                                                       market_context=market_context)
+        report_description = objects.ReportDescription(
+            r_id=r_id,
+            reading_type=reading_type,
+            report_data_source=target,
+            report_subject=target,
+            report_type=report_type,
+            sampling_rate=sampling_rate,
+            measurement=item_base,
+            market_context=market_context)
         self.report_callbacks[(report.report_specifier_id, r_id)] = callback
         report.report_descriptions.append(report_description)
         return report_specifier_id, r_id
@@ -343,7 +395,9 @@ class OpenADRClient:
         """
         request_id = utils.generate_id()
         service = 'EiRegisterParty'
-        message = self._create_message('oadrQueryRegistration', request_id=request_id)
+        message = self._create_message(
+            'oadrQueryRegistration',
+            request_id=request_id)
         response_type, response_payload = await self._perform_request(service, message)
         return response_type, response_payload
 
@@ -466,13 +520,16 @@ class OpenADRClient:
 
         # Send the oadrCreatedReport message
         message_type = 'oadrCreatedReport'
-        message_payload = {'pending_reports': [{'report_request_id': utils.getmember(report, 'report_request_id')} for report in self.report_requests]}
-        message = self._create_message('oadrCreatedReport', response={'response_code': 200,
-                                                                      'response_description': 'OK'},
-                                                            ven_id=self.ven_id,
-                                                            **message_payload)
+        message_payload = {'pending_reports': [{'report_request_id': utils.getmember(
+            report, 'report_request_id')} for report in self.report_requests]}
+        message = self._create_message(
+            'oadrCreatedReport',
+            response={
+                'response_code': 200,
+                'response_description': 'OK'},
+            ven_id=self.ven_id,
+            **message_payload)
         response_type, response_payload = await self._perform_request(service, message)
-
 
     async def create_report(self, report_request):
         """
@@ -501,54 +558,64 @@ class OpenADRClient:
             # Check if the requested r_id actually exists
             rd = utils.find_by(report.report_descriptions, 'r_id', r_id)
             if not rd:
-                logger.error(f"A non-existant report with r_id {r_id} "
-                             f"inside report with report_specifier_id {report_specifier_id} "
-                             f"was requested.")
+                logger.error(
+                    f"A non-existant report with r_id {r_id} "
+                    f"inside report with report_specifier_id {report_specifier_id} "
+                    f"was requested.")
                 continue
 
-            # Check if the requested measurement exists and if the correct unit is requested
+            # Check if the requested measurement exists and if the correct unit
+            # is requested
             if 'measurement' in specifier_payload:
                 measurement = specifier_payload['measurement']
                 if measurement['description'] != rd.measurement.description:
-                    logger.error(f"A non-matching measurement description for report with "
-                                 f"report_request_id {report_request_id} and r_id {r_id} was given "
-                                 f"by the VTN. Offered: {rd.measurement.description}, "
-                                 f"requested: {measurement['description']}")
+                    logger.error(
+                        f"A non-matching measurement description for report with "
+                        f"report_request_id {report_request_id} and r_id {r_id} was given "
+                        f"by the VTN. Offered: {rd.measurement.description}, "
+                        f"requested: {measurement['description']}")
                     continue
                 if measurement['unit'] != rd.measurement.unit:
-                    logger.error(f"A non-matching measurement unit for report with "
-                                 f"report_request_id {report_request_id} and r_id {r_id} was given "
-                                 f"by the VTN. Offered: {rd.measurement.unit}, "
-                                 f"requested: {measurement['unit']}")
+                    logger.error(
+                        f"A non-matching measurement unit for report with "
+                        f"report_request_id {report_request_id} and r_id {r_id} was given "
+                        f"by the VTN. Offered: {rd.measurement.unit}, "
+                        f"requested: {measurement['unit']}")
                     continue
 
             if granularity is not None:
                 if not rd.sampling_rate.min_period <= granularity <= rd.sampling_rate.max_period:
-                    logger.error(f"An invalid sampling rate {granularity} was requested for report "
-                                 f"with report_specifier_id {report_specifier_id} and r_id {r_id}. "
-                                 f"The offered sampling rate was between "
-                                 f"{rd.sampling_rate.min_period} and "
-                                 f"{rd.sampling_rate.max_period}")
+                    logger.error(
+                        f"An invalid sampling rate {granularity} was requested for report "
+                        f"with report_specifier_id {report_specifier_id} and r_id {r_id}. "
+                        f"The offered sampling rate was between "
+                        f"{rd.sampling_rate.min_period} and "
+                        f"{rd.sampling_rate.max_period}")
                     continue
             else:
-                # If no granularity is specified, set it to the lowest sampling rate.
+                # If no granularity is specified, set it to the lowest sampling
+                # rate.
                 granularity = rd.sampling_rate.max_period
 
             requested_r_ids.append(r_id)
 
-        callback = partial(self.update_report, report_request_id=report_request_id)
+        callback = partial(
+            self.update_report,
+            report_request_id=report_request_id)
 
         reporting_interval = report_back_duration or granularity
         job = self.scheduler.add_job(func=callback,
                                      trigger='cron',
                                      **utils.cron_config(reporting_interval))
 
-        self.report_requests.append({'report_request_id': report_request_id,
-                                     'report_specifier_id': report_specifier_id,
-                                     'report_back_duration': report_back_duration,
-                                     'r_ids': requested_r_ids,
-                                     'granularity': granularity,
-                                     'job': job})
+        self.report_requests.append(
+            {
+                'report_request_id': report_request_id,
+                'report_specifier_id': report_specifier_id,
+                'report_back_duration': report_back_duration,
+                'r_ids': requested_r_ids,
+                'granularity': granularity,
+                'job': job})
 
     async def create_single_report(self, report_request):
         """
@@ -560,11 +627,17 @@ class OpenADRClient:
         Call the previously registered report callback and send the result as a message to the VTN.
         """
         logger.debug(f"Running update_report for {report_request_id}")
-        report_request = utils.find_by(self.report_requests, 'report_request_id', report_request_id)
+        report_request = utils.find_by(
+            self.report_requests,
+            'report_request_id',
+            report_request_id)
         granularity = report_request['granularity']
         report_back_duration = report_request['report_back_duration']
         report_specifier_id = report_request['report_specifier_id']
-        report = utils.find_by(self.reports, 'report_specifier_id', report_specifier_id)
+        report = utils.find_by(
+            self.reports,
+            'report_specifier_id',
+            report_specifier_id)
         data_collection_mode = report.data_collection_mode
 
         if report_request_id in self.incomplete_reports:
@@ -572,10 +645,11 @@ class OpenADRClient:
             outgoing_report = self.incomplete_reports[report_request_id]
         else:
             logger.debug("There is no report in progress")
-            outgoing_report = objects.Report(report_request_id=report_request_id,
-                                             report_specifier_id=report.report_specifier_id,
-                                             report_name=report.report_name,
-                                             intervals=[])
+            outgoing_report = objects.Report(
+                report_request_id=report_request_id,
+                report_specifier_id=report.report_specifier_id,
+                report_name=report.report_name,
+                intervals=[])
 
         intervals = outgoing_report.intervals or []
         if data_collection_mode == 'full':
@@ -584,20 +658,25 @@ class OpenADRClient:
             date_to = datetime.now(timezone.utc)
             date_from = date_to - max(report_back_duration, granularity)
             for r_id in report_request['r_ids']:
-                report_callback = self.report_callbacks[(report_specifier_id, r_id)]
+                report_callback = self.report_callbacks[(
+                    report_specifier_id, r_id)]
                 result = report_callback(date_from=date_from,
                                          date_to=date_to,
                                          sampling_interval=granularity)
                 if asyncio.iscoroutine(result):
                     result = await result
                 for dt, value in result:
-                    report_payload = objects.ReportPayload(r_id=r_id, value=value)
-                    intervals.append(objects.ReportInterval(dtstart=dt,
-                                                            report_payload=report_payload))
+                    report_payload = objects.ReportPayload(
+                        r_id=r_id, value=value)
+                    intervals.append(
+                        objects.ReportInterval(
+                            dtstart=dt,
+                            report_payload=report_payload))
 
         else:
             for r_id in report_request['r_ids']:
-                report_callback = self.report_callbacks[(report_specifier_id, r_id)]
+                report_callback = self.report_callbacks[(
+                    report_specifier_id, r_id)]
                 result = report_callback()
                 if asyncio.iscoroutine(result):
                     result = await result
@@ -605,23 +684,30 @@ class OpenADRClient:
                     result = [(datetime.now(timezone.utc), result)]
                 for dt, value in result:
                     logger.info(f"Adding {dt}, {value} to report")
-                    report_payload = objects.ReportPayload(r_id=r_id, value=value)
-                    intervals.append(objects.ReportInterval(dtstart=dt,
-                                                            report_payload=report_payload))
+                    report_payload = objects.ReportPayload(
+                        r_id=r_id, value=value)
+                    intervals.append(
+                        objects.ReportInterval(
+                            dtstart=dt,
+                            report_payload=report_payload))
         outgoing_report.intervals = intervals
-        logger.info(f"The number of intervals in the report is now {len(outgoing_report.intervals)}")
+        logger.info(
+            f"The number of intervals in the report is now {len(outgoing_report.intervals)}")
 
         # Figure out if the report is complete after this sampling
         if data_collection_mode == 'incremental' and report_back_duration is not None\
                 and report_back_duration > granularity:
             report_interval = report_back_duration.total_seconds()
             sampling_interval = granularity.total_seconds()
-            expected_len = len(report_request['r_ids']) * int(report_interval / sampling_interval)
+            expected_len = len(
+                report_request['r_ids']) * int(report_interval / sampling_interval)
             if len(outgoing_report.intervals) == expected_len:
-                logger.info("The report is now complete with all the values. Will queue for sending.")
+                logger.info(
+                    "The report is now complete with all the values. Will queue for sending.")
                 await self.pending_reports.put(self.incomplete_reports.pop(report_request_id))
             else:
-                logger.debug("The report is not yet complete, will hold until it is.")
+                logger.debug(
+                    "The report is not yet complete, will hold until it is.")
                 self.incomplete_reports[report_request_id] = outgoing_report
         else:
             logger.info("Report will be sent now.")
@@ -647,7 +733,8 @@ class OpenADRClient:
                 try:
                     response_type, response_payload = await self._perform_request(service, message)
                 except Exception as err:
-                    logger.error(f"Unable to send the report to the VTN. Error: {err}")
+                    logger.error(
+                        f"Unable to send the report to the VTN. Error: {err}")
                 else:
                     if 'cancel_report' in response_payload:
                         await self.cancel_report(response_payload['cancel_report'])
@@ -664,19 +751,21 @@ class OpenADRClient:
         """
         Placeholder for the on_event handler.
         """
-        logger.warning("You should implement your own on_event handler. This handler receives "
-                       "an Event dict and should return either 'optIn' or 'optOut' based on your "
-                       "choice. Will opt out of the event for now.")
+        logger.warning(
+            "You should implement your own on_event handler. This handler receives "
+            "an Event dict and should return either 'optIn' or 'optOut' based on your "
+            "choice. Will opt out of the event for now.")
         return 'optOut'
 
     async def on_update_event(self, event):
         """
         Placeholder for the on_update_event handler.
         """
-        logger.warning("An Event was updated, but you don't have an on_updated_event handler configured. "
-                       "You should implement your own on_update_event handler. This handler receives "
-                       "an Event dict and should return either 'optIn' or 'optOut' based on your "
-                       "choice. Will re-use the previous opt status for this event_id for now")
+        logger.warning(
+            "An Event was updated, but you don't have an on_updated_event handler configured. "
+            "You should implement your own on_update_event handler. This handler receives "
+            "an Event dict and should return either 'optIn' or 'optOut' based on your "
+            "choice. Will re-use the previous opt status for this event_id for now")
         if event['event_descriptor']['event_id'] in self.responded_events:
             return self.responded_events['event_id']
 
@@ -695,10 +784,12 @@ class OpenADRClient:
         """
         Send an empty oadrResponse, for instance after receiving oadrRequestReregistration.
         """
-        msg = self._create_message('oadrResponse',
-                                   response={'response_code': response_code,
-                                             'response_description': response_description,
-                                             'request_id': request_id})
+        msg = self._create_message(
+            'oadrResponse',
+            response={
+                'response_code': response_code,
+                'response_description': response_description,
+                'request_id': request_id})
         await self._perform_request(service, msg)
 
     ###########################################################################
@@ -715,13 +806,15 @@ class OpenADRClient:
             async with self.client_session.post(url, data=message) as req:
                 content = await req.read()
                 if req.status != HTTPStatus.OK:
-                    logger.warning(f"Non-OK status {req.status} when performing a request to {url} "
-                                   f"with data {message}: {req.status} {content.decode('utf-8')}")
+                    logger.warning(
+                        f"Non-OK status {req.status} when performing a request to {url} "
+                        f"with data {message}: {req.status} {content.decode('utf-8')}")
                     return None, {}
                 logger.debug(content.decode('utf-8'))
         except aiohttp.client_exceptions.ClientConnectorError as err:
             # Could not connect to server
-            logger.error(f"Could not connect to server with URL {self.vtn_url}:")
+            logger.error(
+                f"Could not connect to server with URL {self.vtn_url}:")
             logger.error(f"{err.__class__.__name__}: {str(err)}")
             return None, {}
         except Exception as err:
@@ -732,10 +825,12 @@ class OpenADRClient:
         try:
             tree = validate_xml_schema(content)
             if self.vtn_fingerprint:
-                validate_xml_signature(tree, cert_fingerprint=self.vtn_fingerprint)
+                validate_xml_signature(
+                    tree, cert_fingerprint=self.vtn_fingerprint)
             message_type, message_payload = parse_message(content)
         except XMLSyntaxError as err:
-            logger.warning(f"Incoming message did not pass XML schema validation: {err}")
+            logger.warning(
+                f"Incoming message did not pass XML schema validation: {err}")
             return None, {}
         except errors.FingerprintMismatch as err:
             logger.warning(err)
@@ -744,13 +839,15 @@ class OpenADRClient:
             logger.warning("Incoming message had invalid signature, ignoring.")
             return None, {}
         except Exception as err:
-            logger.error(f"The incoming message could not be parsed or validated: {err}")
+            logger.error(
+                f"The incoming message could not be parsed or validated: {err}")
             return None, {}
         if 'response' in message_payload and 'response_code' in message_payload['response']:
             if message_payload['response']['response_code'] != 200:
-                logger.warning("We got a non-OK OpenADR response from the server: "
-                               f"{message_payload['response']['response_code']}: "
-                               f"{message_payload['response']['response_description']}")
+                logger.warning(
+                    "We got a non-OK OpenADR response from the server: "
+                    f"{message_payload['response']['response_code']}: "
+                    f"{message_payload['response']['response_description']}")
         return message_type, message_payload
 
     async def _on_event(self, message):
@@ -762,14 +859,19 @@ class OpenADRClient:
                 event_id = event['event_descriptor']['event_id']
                 event_status = event['event_descriptor']['event_status']
                 modification_number = event['event_descriptor']['modification_number']
-                received_event = utils.find_by(self.received_events, 'event_descriptor.event_id', event_id)
+                received_event = utils.find_by(
+                    self.received_events, 'event_descriptor.event_id', event_id)
                 if received_event:
                     if received_event['event_descriptor']['modification_number'] == modification_number:
-                        # Re-submit the same opt type as we already had previously
+                        # Re-submit the same opt type as we already had
+                        # previously
                         result = self.responded_events[event_id]
                     else:
                         # Replace the event with the fresh copy
-                        utils.pop_by(self.received_events, 'event_descriptor.event_id', event_id)
+                        utils.pop_by(
+                            self.received_events,
+                            'event_descriptor.event_id',
+                            event_id)
                         self.received_events.append(event)
                         # Wait for the result of the on_update_event handler
                         result = await utils.await_if_required(self.on_update_event(event))
@@ -780,18 +882,24 @@ class OpenADRClient:
                 if asyncio.iscoroutine(result):
                     result = await result
                 results.append(result)
-                if event_status in (enums.EVENT_STATUS.COMPLETED, enums.EVENT_STATUS.CANCELLED):
+                if event_status in (
+                        enums.EVENT_STATUS.COMPLETED,
+                        enums.EVENT_STATUS.CANCELLED):
                     self.responded_events.pop(event_id)
                 else:
                     self.responded_events[event_id] = result
             for i, result in enumerate(results):
-                if result not in ('optIn', 'optOut') and events[i]['response_required'] == 'always':
-                    logger.error("Your on_event or on_update_event handler must return 'optIn' or 'optOut'; "
-                                 f"you supplied {result}. Please fix your on_event handler.")
+                if result not in (
+                    'optIn',
+                        'optOut') and events[i]['response_required'] == 'always':
+                    logger.error(
+                        "Your on_event or on_update_event handler must return 'optIn' or 'optOut'; "
+                        f"you supplied {result}. Please fix your on_event handler.")
                     results[i] = 'optOut'
         except Exception as err:
-            logger.error("Your on_event handler encountered an error. Will Opt Out of the event. "
-                         f"The error was {err.__class__.__name__}: {str(err)}")
+            logger.error(
+                "Your on_event handler encountered an error. Will Opt Out of the event. "
+                f"The error was {err.__class__.__name__}: {str(err)}")
             results = ['optOut'] * len(events)
 
         event_responses = [{'response_code': 200,
@@ -816,7 +924,8 @@ class OpenADRClient:
             response_type, response_payload = await self._perform_request(service, message)
             logger.info(response_type, response_payload)
         else:
-            logger.info("Not sending any event responses, because a response was not required/allowed by the VTN.")
+            logger.info(
+                "Not sending any event responses, because a response was not required/allowed by the VTN.")
 
     async def _event_cleanup(self):
         """
@@ -825,7 +934,8 @@ class OpenADRClient:
         for event in self.received_events:
             if event['event_descriptor']['event_status'] == 'cancelled' or \
                     utils.determine_event_status(event['active_period']) == 'completed':
-                logger.info(f"Removing event {event} because it is no longer relevant.")
+                logger.info(
+                    f"Removing event {event} because it is no longer relevant.")
                 self.received_events.pop(self.received_events.index(event))
 
     async def _poll(self):
@@ -839,14 +949,16 @@ class OpenADRClient:
             return
 
         elif response_type == 'oadrRequestReregistration':
-            logger.info("The VTN required us to re-register. Calling the registration procedure.")
+            logger.info(
+                "The VTN required us to re-register. Calling the registration procedure.")
             await self.send_response(service='EiRegisterParty')
             await self.create_party_registration()
             if self.reports:
                 await self.register_reports(self.reports)
 
         elif response_type == 'oadrDistributeEvent':
-            if 'events' in response_payload and len(response_payload['events']) > 0:
+            if 'events' in response_payload and len(
+                    response_payload['events']) > 0:
                 await self._on_event(response_payload)
 
         elif response_type == 'oadrUpdateReport':
@@ -858,7 +970,8 @@ class OpenADRClient:
                     await self.create_report(report_request)
 
         elif response_type == 'oadrRegisterReport':
-            if 'reports' in response_payload and len(response_payload['reports']) > 0:
+            if 'reports' in response_payload and len(
+                    response_payload['reports']) > 0:
                 for report in response_payload['reports']:
                     await self.register_report(report)
 
@@ -873,11 +986,13 @@ class OpenADRClient:
         if not self.client_session:
             headers = {'content-type': 'application/xml'}
             if self.cert_path:
-                ssl_context = ssl.create_default_context(cafile=self.ca_file,
-                                                         purpose=ssl.Purpose.CLIENT_AUTH)
-                ssl_context.load_cert_chain(self.cert_path, self.key_path, self.passphrase)
+                ssl_context = ssl.create_default_context(
+                    cafile=self.ca_file, purpose=ssl.Purpose.CLIENT_AUTH)
+                ssl_context.load_cert_chain(
+                    self.cert_path, self.key_path, self.passphrase)
                 ssl_context.check_hostname = False
                 connector = aiohttp.TCPConnector(ssl=ssl_context)
-                self.client_session = aiohttp.ClientSession(connector=connector, headers=headers)
+                self.client_session = aiohttp.ClientSession(
+                    connector=connector, headers=headers)
             else:
                 self.client_session = aiohttp.ClientSession(headers=headers)
