@@ -354,7 +354,9 @@ class OpenADRClient:
 
         # Add the new report description to the report
         target = objects.Target(resource_id=resource_id)
-        r_id = utils.generate_id()
+        if not r_id:
+            r_id = utils.generate_id()
+
         report_description = objects.ReportDescription(
             r_id=r_id,
             reading_type=reading_type,
@@ -558,9 +560,8 @@ class OpenADRClient:
         # for report setting dtstart, duration
         report_interval = report_request['report_specifier'].get(
             'report_interval')
-        logger.info("report_interval" + report_interval)
         if report_interval:
-            report.dtstart = report_interval['properties']['dtstart']
+            report.dtstart = report_interval['dtstart']
         else:
             report.dtstart = datetime.now()
 
@@ -704,6 +705,7 @@ class OpenADRClient:
                             dtstart=dt,
                             report_payload=report_payload))
         outgoing_report.intervals = intervals
+        outgoing_report.dtstart = report.dtstart
         logger.info(
             f"The number of intervals in the report is now {len(outgoing_report.intervals)}")
 
@@ -823,7 +825,7 @@ class OpenADRClient:
                         f"Non-OK status {req.status} when performing a request to {url} "
                         f"with data {message}: {req.status} {content.decode('utf-8')}")
                     return None, {}
-                logger.debug('response:' + content.decode('utf-8'))
+                logger.debug(content.decode('utf-8'))
         except aiohttp.client_exceptions.ClientConnectorError as err:
             # Could not connect to server
             logger.error(

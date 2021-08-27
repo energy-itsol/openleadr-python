@@ -4,7 +4,7 @@
     {% if reports %}
     {% for report in reports %}
     <oadr:oadrReport xmlns:xcal="urn:ietf:params:xml:ns:icalendar-2.0">
-      {% if report.dtstart is defined and report.dtstart is not none %}
+      {% if report.dtstart is not none %}
       <xcal:dtstart>
         <xcal:date-time>{{ report.dtstart|datetimeformat }}</xcal:date-time>
       </xcal:dtstart>
