@@ -14,15 +14,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# flake8: noqa
+from . import service, handler, VENService
+import asyncio
+from openleadr import utils, errors, enums
+import logging
+logger = logging.getLogger('openleadr')
 
-from .decorators import handler, service
-from .vtn_service import VTNService
-from .ven_service import VENService
-from .event_service import EventService
-from .poll_service import PollService
-from .registration_service import RegistrationService
-from .report_service import ReportService
-from .ven_report_service import VENReportService
-from .ven_event_service import VENEventService
-from .opt_service import OptService
+
+@service('EiEvent')
+class VENEventService(VENService):
+
+    def __init__(self, ven_id, client):
+        super().__init__(ven_id)
+        self.client = client
+
+    @handler('oadrDistributeEvent')
+    async def create_event(self, payload):
+        """
+        The VEN informs us that they created an EiEvent.
+        """
+
+        if 'events' in payload and len(
+                payload['events']) > 0:
+            await self.client._on_event(payload)

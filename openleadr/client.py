@@ -31,6 +31,12 @@ from openleadr.messaging import create_message, parse_message, \
     validate_xml_schema, validate_xml_signature
 from openleadr import utils
 
+# for push model
+from aiohttp import web
+from openleadr.service import EventService, VENReportService, VENService, VENEventService
+from openleadr.messaging import create_message
+from openleadr import objects, enums, utils
+
 logger = logging.getLogger('openleadr')
 
 
@@ -52,6 +58,8 @@ class OpenADRClient:
             show_fingerprint=True,
             ca_file=None,
             allow_jitter=True,
+            http_pull_model=True,
+            transport_address=None,
             ven_id=None):
         """
         Initializes a new OpenADR Client (Virtual End Node)
@@ -83,6 +91,14 @@ class OpenADRClient:
         self.poll_frequency = None
         self.vtn_fingerprint = vtn_fingerprint
         self.debug = debug
+        self.http_pull_model = http_pull_model
+
+        # for push moddel
+        self.transport_address = transport_address
+        self.http_port = 8088
+        self.http_host = 'localhost'
+        self.ssl_context = None
+        self.http_path_prefix = '/OpenADR2/Simple/2.0b'
 
         self.reports = []
         # Holds the callbacks for each specific report
@@ -136,7 +152,7 @@ class OpenADRClient:
         # if not hasattr(self, 'on_event'):
         #     raise NotImplementedError("You must implement on_event.")
         self.loop = asyncio.get_event_loop()
-        await self.create_party_registration(ven_id=self.ven_id)
+        await self.create_party_registration(ven_id=self.ven_id, http_pull_model=self.http_pull_model, transport_address=self.transport_address)
 
         if not self.ven_id:
             logger.error("No VEN ID received from the VTN, aborting.")
@@ -148,21 +164,55 @@ class OpenADRClient:
             self.report_queue_task = self.loop.create_task(
                 self._report_queue_worker())
 
-        await self._poll()
+        # pull の場合のみ、polling を起動する(push の場合は、不要)
+        if self.http_pull_model:
+            await self._poll()
+            # Set up automatic polling
+            if self.poll_frequency > timedelta(hours=24):
+                logger.warning(
+                    "Polling with intervals of more than 24 hours is not supported. "
+                    "Will use 24 hours as the polling interval.")
+                self.poll_frequency = timedelta(hours=24)
+            cron_config = utils.cron_config(
+                self.poll_frequency,
+                randomize_seconds=self.allow_jitter)
 
-        # Set up automatic polling
-        if self.poll_frequency > timedelta(hours=24):
-            logger.warning(
-                "Polling with intervals of more than 24 hours is not supported. "
-                "Will use 24 hours as the polling interval.")
-            self.poll_frequency = timedelta(hours=24)
-        cron_config = utils.cron_config(
-            self.poll_frequency,
-            randomize_seconds=self.allow_jitter)
+            self.scheduler.add_job(self._poll,
+                                   trigger='cron',
+                                   **cron_config)
+        else:
+            self.app = web.Application()
+            self.services = {}
+            self.services['event_service'] = VENEventService(self.ven_id, self)
+            self.services['report_service'] = VENReportService(
+                self.ven_id, self)
 
-        self.scheduler.add_job(self._poll,
-                               trigger='cron',
-                               **cron_config)
+            # Set up the HTTP handlers for the services
+            if self.http_path_prefix[-1] == "/":
+                http_path_prefix = self.http_path_prefix[:-1]
+            self.app.add_routes(
+                [
+                    web.post(
+                        f"{self.http_path_prefix}/{s.__service_name__}",
+                        s.handler) for s in self.services.values()])
+
+            """
+            Starts the server in an already-running asyncio loop.
+            """
+            self.app_runner = web.AppRunner(self.app)
+            await self.app_runner.setup()
+            site = web.TCPSite(self.app_runner,
+                               port=self.http_port,
+                               host=self.http_host,
+                               ssl_context=self.ssl_context)
+            await site.start()
+            protocol = 'https' if self.ssl_context else 'http'
+            print(
+                f"{protocol}://{self.http_host}:{self.http_port}{self.http_path_prefix}".center(80))
+
+            VENService._create_message = partial(
+                create_message, cert=None, key=None, passphrase=None)
+
         self.scheduler.add_job(self._event_cleanup,
                                trigger='interval',
                                seconds=300)
@@ -631,6 +681,98 @@ class OpenADRClient:
                 'granularity': granularity,
                 'job': job})
 
+    async def update_report(self, report_request_id):
+        """
+        Call the previously registered report callback and send the result as a message to the VTN.
+        """
+        logger.debug(f"Running update_report for {report_request_id}")
+        report_request = utils.find_by(
+            self.report_requests,
+            'report_request_id',
+            report_request_id)
+        granularity = report_request['granularity']
+        report_back_duration = report_request['report_back_duration']
+        report_specifier_id = report_request['report_specifier_id']
+        report = utils.find_by(
+            self.reports,
+            'report_specifier_id',
+            report_specifier_id)
+        data_collection_mode = report.data_collection_mode
+
+        if report_request_id in self.incomplete_reports:
+            logger.debug("We were already compiling this report")
+            outgoing_report = self.incomplete_reports[report_request_id]
+        else:
+            logger.debug("There is no report in progress")
+            outgoing_report = objects.Report(
+                report_request_id=report_request_id,
+                report_specifier_id=report.report_specifier_id,
+                report_name=report.report_name,
+                intervals=[])
+
+        intervals = outgoing_report.intervals or []
+        if data_collection_mode == 'full':
+            if report_back_duration is None:
+                report_back_duration = granularity
+            date_to = datetime.now(timezone.utc)
+            date_from = date_to - max(report_back_duration, granularity)
+            for r_id in report_request['r_ids']:
+                report_callback = self.report_callbacks[(
+                    report_specifier_id, r_id)]
+                result = report_callback(date_from=date_from,
+                                         date_to=date_to,
+                                         sampling_interval=granularity)
+                if asyncio.iscoroutine(result):
+                    result = await result
+                for dt, value in result:
+                    report_payload = objects.ReportPayload(
+                        r_id=r_id, value=value)
+                    intervals.append(
+                        objects.ReportInterval(
+                            dtstart=dt,
+                            report_payload=report_payload))
+
+        else:
+            for r_id in report_request['r_ids']:
+                report_callback = self.report_callbacks[(
+                    report_specifier_id, r_id)]
+                result = report_callback()
+                if asyncio.iscoroutine(result):
+                    result = await result
+                if isinstance(result, (int, float)):
+                    result = [(datetime.now(timezone.utc), result)]
+                for dt, value in result:
+                    logger.info(f"Adding {dt}, {value} to report")
+                    report_payload = objects.ReportPayload(
+                        r_id=r_id, value=value)
+                    intervals.append(
+                        objects.ReportInterval(
+                            dtstart=dt,
+                            report_payload=report_payload))
+        outgoing_report.intervals = intervals
+        outgoing_report.dtstart = report.dtstart
+        logger.info(
+            f"The number of intervals in the report is now {len(outgoing_report.intervals)}")
+
+        # Figure out if the report is complete after this sampling
+        if data_collection_mode == 'incremental' and report_back_duration is not None\
+                and report_back_duration > granularity:
+            report_interval = report_back_duration.total_seconds()
+            sampling_interval = granularity.total_seconds()
+            expected_len = len(
+                report_request['r_ids']) * int(report_interval / sampling_interval)
+            if len(outgoing_report.intervals) == expected_len:
+                logger.info(
+                    "The report is now complete with all the values. Will queue for sending.")
+                await self.pending_reports.put(self.incomplete_reports.pop(report_request_id))
+            else:
+                logger.debug(
+                    "The report is not yet complete, will hold until it is.")
+                self.incomplete_reports[report_request_id] = outgoing_report
+        else:
+            logger.info("Report will be sent now.")
+            await self.pending_reports.put(outgoing_report)
+
     async def create_single_report(self, report_request):
         """
         Create a single report in response to a request from the VTN.
@@ -903,6 +1045,7 @@ class OpenADRClient:
                     self.responded_events.pop(event_id)
                 else:
                     self.responded_events[event_id] = result
+
             for i, result in enumerate(results):
                 if result not in (
                     'optIn',
@@ -912,6 +1055,7 @@ class OpenADRClient:
                         f"you supplied {result}. Please fix your on_event handler.")
                     results[i] = 'optOut'
         except Exception as err:
+            logger.error(err, exc_info=True)
             logger.error(
                 "Your on_event handler encountered an error. Will Opt Out of the event. "
                 f"The error was {err.__class__.__name__}: {str(err)}")
