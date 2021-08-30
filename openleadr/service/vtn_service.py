@@ -46,8 +46,8 @@ class VTNService:
             # Check the Content-Type header
             content_type = request.headers.get('content-type', '')
             if not content_type.lower().startswith("application/xml"):
-                raise errors.HTTPError(response_code=HTTPStatus.BAD_REQUEST,
-                                       response_description="The Content-Type header must be application/xml; "
+                raise errors.HTTPError(status=HTTPStatus.BAD_REQUEST,
+                                       description="The Content-Type header must be application/xml; "
                                                             f"you provided {request.headers.get('content-type', '')}")
             content = await request.read()
             hooks.call('before_parse', content)
