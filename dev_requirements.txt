@@ -1,5 +1,7 @@
 termcolor
 pytest
 pytest-asyncio
+PyMySQL==0.9.3
+pymysql-pool
 sphinx
 sphinxcontrib-apidoc

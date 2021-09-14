@@ -17,6 +17,7 @@
 import asyncio
 import inspect
 import logging
+from openleadr.jobs import Job
 import ssl
 from datetime import datetime, timedelta, timezone
 from functools import partial
@@ -109,7 +110,7 @@ class OpenADRClient:
         self.incomplete_reports = {}
         # Holds reports that are waiting to be sent
         self.pending_reports = asyncio.Queue()
-        self.scheduler = AsyncIOScheduler()
+        self.job = Job(self.update_report)
         self.client_session = None
         self.report_queue_task = None
 
@@ -177,7 +178,7 @@ class OpenADRClient:
                 self.poll_frequency,
                 randomize_seconds=self.allow_jitter)
 
-            self.scheduler.add_job(self._poll,
+            self.job.scheduler.add_job(self._poll,
                                    trigger='cron',
                                    **cron_config)
         else:
@@ -213,17 +214,17 @@ class OpenADRClient:
             VENService._create_message = partial(
                 create_message, cert=None, key=None, passphrase=None)
 
-        self.scheduler.add_job(self._event_cleanup,
+        self.job.scheduler.add_job(self._event_cleanup,
                                trigger='interval',
                                seconds=300)
-        self.scheduler.start()
+        self.job.start()
 
     async def stop(self):
         """
         Cleanly stops the client. Run this coroutine before closing your event loop.
         """
-        if self.scheduler.running:
-            self.scheduler.shutdown()
+        if self.job.scheduler.running:
+            self.job.scheduler.shutdown()
         if self.report_queue_task:
             self.report_queue_task.cancel()
         await self.client_session.close()
@@ -667,19 +668,27 @@ class OpenADRClient:
             self.update_report,
             report_request_id=report_request_id)
 
-        reporting_interval = report_back_duration or granularity
-        job = self.scheduler.add_job(func=callback,
-                                     trigger='cron',
-                                     **utils.cron_config(reporting_interval))
+        request = {
+            'report_request_id': report_request_id,
+            'report_specifier_id': report_specifier_id,
+            'report_back_duration': report_back_duration,
+            'report_interval': report_interval,
+            'r_ids': requested_r_ids,
+            'granularity': granularity,
+            'start_datetime': report_interval['dtstart'],
+            'end_datetime': report_interval['dtstart'].timedelta(report_interval['duration'])
+        }
+        if report_back_duration != timedelta(seconds=0):
+            self.job.add(dataset=request, callback=callback)
 
         self.report_requests.append(
             {
                 'report_request_id': report_request_id,
                 'report_specifier_id': report_specifier_id,
                 'report_back_duration': report_back_duration,
+                'report_interval': report_interval,
                 'r_ids': requested_r_ids,
-                'granularity': granularity,
-                'job': job})
+                'granularity': granularity})
 
     async def update_report(self, report_request_id):
         """

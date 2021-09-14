@@ -461,7 +461,7 @@ def pop_by(list_, key, value, *args):
     return item
 
 
-def cron_config(interval, randomize_seconds=False):
+def cron_config(interval, fixed_seconds="0", randomize_seconds=False):
     """
     Returns a dict with cron settings for the given interval
     """
@@ -470,15 +470,15 @@ def cron_config(interval, randomize_seconds=False):
         minute = "*"
         hour = "*"
     elif interval < timedelta(hours=1):
-        second = "0"
+        second = fixed_seconds
         minute = f"*/{int(interval.total_seconds()/60)}"
         hour = "*"
     elif interval < timedelta(hours=24):
-        second = "0"
+        second = fixed_seconds
         minute = "0"
         hour = f"*/{int(interval.total_seconds()/3600)}"
     else:
-        second = "0"
+        second = fixed_seconds
         minute = "0"
         hour = "0"
     cron_config = {"second": second, "minute": minute, "hour": hour}
