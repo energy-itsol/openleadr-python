@@ -294,6 +294,7 @@ class Report:
     report_specifier_id: str            # This is what the VEN calls this report
     # Usually one of the default ones (enums.REPORT_NAME)
     report_name: str
+    register_report_name: str = None
     report_request_id: str = None       # Usually empty
     report_descriptions: List[ReportDescription] = None
     created_date_time: datetime = None

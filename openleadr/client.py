@@ -165,7 +165,7 @@ class OpenADRClient:
             self.report_queue_task = self.loop.create_task(
                 self._report_queue_worker())
 
-        # pull ÇÃèÍçáÇÃÇ›ÅApolling ÇãNìÆÇ∑ÇÈ(push ÇÃèÍçáÇÕÅAïsóv)
+        # pull ÔøΩÃèÍçáÔøΩÃÇ›ÅApolling ÔøΩÔøΩÔøΩNÔøΩÔøΩÔøΩÔøΩÔøΩÔøΩ(push ÔøΩÃèÍçáÔøΩÕÅAÔøΩsÔøΩv)
         if self.http_pull_model:
             await self._poll()
             # Set up automatic polling
@@ -179,8 +179,8 @@ class OpenADRClient:
                 randomize_seconds=self.allow_jitter)
 
             self.job.scheduler.add_job(self._poll,
-                                   trigger='cron',
-                                   **cron_config)
+                                       trigger='cron',
+                                       **cron_config)
         else:
             self.app = web.Application()
             self.services = {}
@@ -215,8 +215,8 @@ class OpenADRClient:
                 create_message, cert=None, key=None, passphrase=None)
 
         self.job.scheduler.add_job(self._event_cleanup,
-                               trigger='interval',
-                               seconds=300)
+                                   trigger='interval',
+                                   seconds=300)
         self.job.start()
 
     async def stop(self):
@@ -249,10 +249,13 @@ class OpenADRClient:
             data_collection_mode='incremental',
             report_specifier_id=None,
             r_id=None,
+            register_report_name=enums.REPORT_NAME.TELEMETRY_USAGE,
             report_name=enums.REPORT_NAME.TELEMETRY_USAGE,
             reading_type=enums.READING_TYPE.DIRECT_READ,
             report_type=enums.REPORT_TYPE.READING,
             sampling_rate=None,
+            min_period=None,
+            max_period=None,
             data_source=None,
             scale="none",
             unit=None,
@@ -302,12 +305,12 @@ class OpenADRClient:
         """
 
         # Verify input
-        if report_name not in enums.REPORT_NAME.values and not report_name.startswith(
-                'x-'):
-            raise ValueError(
-                f"{report_name} is not a valid report_name. Valid options are "
-                f"{', '.join(enums.REPORT_NAME.values)}",
-                " or any name starting with 'x-'.")
+        # if report_name not in enums.REPORT_NAME.values and not report_name.startswith(
+        #         'x-'):
+        #     raise ValueError(
+        #         f"{report_name} is not a valid report_name. Valid options are "
+        #         f"{', '.join(enums.REPORT_NAME.values)}",
+        #         " or any name starting with 'x-'.")
         if reading_type not in enums.READING_TYPE.values and not reading_type.startswith(
                 'x-'):
             raise ValueError(
@@ -331,8 +334,8 @@ class OpenADRClient:
                     seconds=10), max_period=timedelta(
                     hours=24), on_change=False)
         elif isinstance(sampling_rate, timedelta):
-            sampling_rate = objects.SamplingRate(min_period=sampling_rate,
-                                                 max_period=sampling_rate,
+            sampling_rate = objects.SamplingRate(min_period=min_period,
+                                                 max_period=max_period,
                                                  on_change=False)
 
         if data_collection_mode not in ('incremental', 'full'):
@@ -399,6 +402,7 @@ class OpenADRClient:
             report_specifier_id = report_specifier_id or utils.generate_id()
             report = objects.Report(created_date_time=datetime.now(),
                                     report_name=report_name,
+                                    register_report_name=register_report_name,
                                     report_specifier_id=report_specifier_id,
                                     data_collection_mode=data_collection_mode)
             self.reports.append(report)
@@ -597,6 +601,8 @@ class OpenADRClient:
         report_back_duration = report_request['report_specifier'].get(
             'report_back_duration')
         granularity = report_request['report_specifier']['granularity']
+        report_interval = report_request['report_specifier'].get(
+            'report_interval')
 
         # Check if this report actually exists
         report = utils.find_by(
@@ -609,8 +615,7 @@ class OpenADRClient:
             return False
 
         # for report setting dtstart, duration
-        report_interval = report_request['report_specifier'].get(
-            'report_interval')
+        # TODO: „Åì„ÅÆË®≠ÂÆö„ÅØÂøÖË¶ÅÔºü
         if report_interval:
             report.dtstart = report_interval['dtstart']
         else:
@@ -648,19 +653,19 @@ class OpenADRClient:
                         f"requested: {measurement['unit']}")
                     continue
 
-            if granularity is not None:
-                if not rd.sampling_rate.min_period <= granularity <= rd.sampling_rate.max_period:
-                    logger.error(
-                        f"An invalid sampling rate {granularity} was requested for report "
-                        f"with report_specifier_id {report_specifier_id} and r_id {r_id}. "
-                        f"The offered sampling rate was between "
-                        f"{rd.sampling_rate.min_period} and "
-                        f"{rd.sampling_rate.max_period}")
-                    continue
-            else:
-                # If no granularity is specified, set it to the lowest sampling
-                # rate.
-                granularity = rd.sampling_rate.max_period
+            # if granularity is not None:
+            #     if not rd.sampling_rate.min_period <= granularity <= rd.sampling_rate.max_period:
+            #         logger.error(
+            #             f"An invalid sampling rate {granularity} was requested for report "
+            #             f"with report_specifier_id {report_specifier_id} and r_id {r_id}. "
+            #             f"The offered sampling rate was between "
+            #             f"{rd.sampling_rate.min_period} and "
+            #             f"{rd.sampling_rate.max_period}")
+            #         continue
+            # else:
+            #     # If no granularity is specified, set it to the lowest sampling
+            #     # rate.
+            #     granularity = rd.sampling_rate.max_period
 
             requested_r_ids.append(r_id)
 
@@ -701,6 +706,7 @@ class OpenADRClient:
             report_request_id)
         granularity = report_request['granularity']
         report_back_duration = report_request['report_back_duration']
+        report_interval = report_request['report_interval']
         report_specifier_id = report_request['report_specifier_id']
         report = utils.find_by(
             self.reports,
@@ -723,14 +729,17 @@ class OpenADRClient:
         if data_collection_mode == 'full':
             if report_back_duration is None:
                 report_back_duration = granularity
-            date_to = datetime.now(timezone.utc)
-            date_from = date_to - max(report_back_duration, granularity)
+            date_from = report_interval['dtstart']
+            date_to = report_interval['dtstart'] + \
+                utils.timedeltaformat(report_interval['duration'])
             for r_id in report_request['r_ids']:
                 report_callback = self.report_callbacks[(
                     report_specifier_id, r_id)]
-                result = report_callback(date_from=date_from,
-                                         date_to=date_to,
-                                         sampling_interval=granularity)
+                result = report_callback(
+                    report_specifier_id=report_specifier_id,
+                    date_from=date_from,
+                    date_to=date_to,
+                    sampling_interval=granularity)
                 if asyncio.iscoroutine(result):
                     result = await result
                 for dt, value in result:
@@ -739,6 +748,7 @@ class OpenADRClient:
                     intervals.append(
                         objects.ReportInterval(
                             dtstart=dt,
+                            duration=utils.timedeltaformat(granularity),
                             report_payload=report_payload))
 
         else:
@@ -757,9 +767,15 @@ class OpenADRClient:
                     intervals.append(
                         objects.ReportInterval(
                             dtstart=dt,
+                            duration=utils.timedeltaformat(granularity),
                             report_payload=report_payload))
+
+        for index, interval in enumerate(intervals):
+            interval.uid = index
+            
         outgoing_report.intervals = intervals
         outgoing_report.dtstart = report.dtstart
+        outgoing_report.duration = report.duration
         logger.info(
             f"The number of intervals in the report is now {len(outgoing_report.intervals)}")
 
@@ -782,15 +798,30 @@ class OpenADRClient:
             logger.info("Report will be sent now.")
             await self.pending_reports.put(outgoing_report)
 
-    async def create_single_report(self, report_request):
+    async def update_single_report(self, report_request):
         """
         Create a single report in response to a request from the VTN.
         """
+        # Send the oadrCreatedReport message
+        service = 'EiReport'
+        message_payload = {'pending_reports': [{'report_request_id': utils.getmember(
+            report, 'report_request_id')} for report in self.reports]}
+        message = self._create_message(
+            'oadrCreatedReport',
+            response={
+                'response_code': 200,
+                'response_description': 'OK'},
+            ven_id=self.ven_id,
+            **message_payload)
+        response_type, response_payload = await self._perform_request(service, message)
 
-    async def update_report(self, report_request_id):
+        await self.update_report_oneshot(report_request_id=report_request['report_request_id'])
+
+    async def update_report_oneshot(self, report_request_id):
         """
         Call the previously registered report callback and send the result as a message to the VTN.
         """
+        report_request_id = report_request_id
         logger.debug(f"Running update_report for {report_request_id}")
         report_request = utils.find_by(
             self.report_requests,
@@ -799,6 +830,7 @@ class OpenADRClient:
         granularity = report_request['granularity']
         report_back_duration = report_request['report_back_duration']
         report_specifier_id = report_request['report_specifier_id']
+        report_interval = report_request['report_interval']
         report = utils.find_by(
             self.reports,
             'report_specifier_id',
@@ -820,14 +852,17 @@ class OpenADRClient:
         if data_collection_mode == 'full':
             if report_back_duration is None:
                 report_back_duration = granularity
-            date_to = datetime.now(timezone.utc)
-            date_from = date_to - max(report_back_duration, granularity)
+            date_from = report_interval['dtstart']
+            date_to = report_interval['dtstart'] + \
+                utils.parse_duration(report_interval['duration'])
             for r_id in report_request['r_ids']:
                 report_callback = self.report_callbacks[(
                     report_specifier_id, r_id)]
-                result = report_callback(date_from=date_from,
-                                         date_to=date_to,
-                                         sampling_interval=granularity)
+                result = report_callback(
+                    report_specifier_id=report_specifier_id,
+                    date_from=date_from,
+                    date_to=date_to,
+                    sampling_interval=granularity)
                 if asyncio.iscoroutine(result):
                     result = await result
                 for dt, value in result:
@@ -836,6 +871,7 @@ class OpenADRClient:
                     intervals.append(
                         objects.ReportInterval(
                             dtstart=dt,
+                            duration=utils.timedeltaformat(timedelta(minutes=30)),
                             report_payload=report_payload))
 
         else:
@@ -854,7 +890,13 @@ class OpenADRClient:
                     intervals.append(
                         objects.ReportInterval(
                             dtstart=dt,
+                            duration=utils.timedeltaformat(timedelta(minutes=30)),
                             report_payload=report_payload))
+
+
+        for index, interval in enumerate(intervals):
+            interval.uid = index
+
         outgoing_report.intervals = intervals
         outgoing_report.dtstart = report.dtstart
         logger.info(

@@ -262,13 +262,17 @@ class VENReportService(VENService):
             for report_request in report_request['report_requests']:
                 report_specifier_id = report_request['report_specifier']['report_specifier_id']
                 cycle_grain = report_specifier_id.split('_')[-2]
-                print(cycle_grain)
-                cycle, _ = cycle_grain.split(
-                    '-')[0], cycle_grain.split('-')[1]
-                if cycle == '00m':
-                    await self.client.create_single_report(report_request)
-                else:
+                if cycle_grain == "0001":
                     await self.client.create_report(report_request)
+                    await self.client.update_report(report_request['report_request_id'])
+                else:
+                    cycle, _ = cycle_grain.split(
+                        '-')[0], cycle_grain.split('-')[1]
+                    if cycle == '00m':
+                        await self.client.create_report(report_request)
+                        await self.client.update_single_report(report_request)
+                    else:
+                        await self.client.create_report(report_request)
 
             message_payload = {'pending_reports': [{'report_request_id': utils.getmember(
                 report, 'report_request_id')} for report in self.client.report_requests]}
