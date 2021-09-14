@@ -23,7 +23,7 @@
       <ei:reportRequestID></ei:reportRequestID>
       {% endif %}
       <ei:reportSpecifierID>{{ report.report_specifier_id }}</ei:reportSpecifierID>
-      <ei:reportName>{{ report.report_name }}</ei:reportName>
+      <ei:reportName>{{ report.register_report_name }}</ei:reportName>
       <ei:createdDateTime>{{ report.created_date_time|datetimeformat }}</ei:createdDateTime>
     </oadr:oadrReport>
 {% endfor %}

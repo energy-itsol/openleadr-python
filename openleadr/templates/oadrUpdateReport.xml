@@ -9,6 +9,11 @@
         <xcal:date-time>{{ report.dtstart|datetimeformat }}</xcal:date-time>
       </xcal:dtstart>
       {% endif %}
+      {% if report.duration is defined and report.dtstart is not none %}
+      <xcal:duration>
+        <xcal:date-time>{{ report.duration|datetimeformat }}</xcal:date-time>
+      </xcal:duration>
+      {% endif %}
 
       {% if report.intervals %}
       <strm:intervals xmlns:strm="urn:ietf:params:xml:ns:icalendar-2.0:stream">
@@ -17,6 +22,12 @@
           <xcal:dtstart>
             <xcal:date-time>{{ interval.dtstart|datetimeformat }}</xcal:date-time>
           </xcal:dtstart>
+          <xcal:duration>
+            <xcal:date-time>{{ interval.duration|datetimeformat }}</xcal:date-time>
+          </xcal:duration>
+          <xcal:uid>
+            <xcal:text>{{ interval.uid }}</xcal:text>
+          </xcal:uid>
           <oadr:oadrReportPayload>
             <ei:rID>{{ interval.report_payload.r_id }}</ei:rID>
             {% if interval.report_payload.confidence is defined and interval.report_payload.confidence is not none %}
