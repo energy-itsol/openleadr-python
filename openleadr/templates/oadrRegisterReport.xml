@@ -13,7 +13,6 @@
         <xcal:duration>{{ report.duration|timedeltaformat }}</xcal:duration>
       </xcal:duration>
       {% endif %}
-      <ei:eiReportID>{{ report.report_id }}</ei:eiReportID>
   {% for report_description in report.report_descriptions %}
       {% include 'parts/oadrReportDescription.xml' %}
   {% endfor %}
@@ -29,9 +28,6 @@
 {% endfor %}
     {% if ven_id is defined and ven_id is not none %}
     <ei:venID>{{ ven_id }}</ei:venID>
-    {% endif %}
-    {% if report_request_id is defined and report_request_id is not none %}
-    <ei:reportRequestID>{{ report_request_id }}</ei:reportRequestID>
     {% endif %}
   </oadr:oadrRegisterReport>
 </oadr:oadrSignedObject>

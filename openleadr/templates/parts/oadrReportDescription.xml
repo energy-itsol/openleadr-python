@@ -8,35 +8,6 @@
   </ei:reportSubject>
   {% endif %}
 
-  {% if report_description.report_data_source %}
-  <ei:reportDataSource>
-    {% if report_description.report_data_source.emix_interfaces %}
-        {% for emix_interface in target.emix_interface %}
-            {% include 'parts/emixInterface.xml' %}
-        {% endfor %}
-    {% endif %}
-
-    {% if report_description.report_data_source.group_id %}
-        <ei:groupID>{{ report_description.report_data_source.group_id }}</ei:groupID>
-    {% endif %}
-
-    {% if report_description.report_data_source.group_name %}
-        <ei:groupName>{{ report_description.report_data_source.group_name }}</ei:groupName>
-    {% endif %}
-
-    {% if report_description.report_data_source.resource_id %}
-        <ei:resourceID>{{ report_description.report_data_source.resource_id }}</ei:resourceID>
-    {% endif %}
-
-    {% if report_description.report_data_source.ven_id %}
-        <ei:venID>{{ report_description.report_data_source.ven_id }}</ei:venID>
-    {% endif %}
-
-    {% if report_description.report_data_source.party_id %}
-        <ei:partyID>{{ report_description.report_data_source.party_id }}</ei:partyID>
-    {% endif %}
-  </ei:reportDataSource>
-  {% endif %}
   <ei:reportType>{{ report_description.report_type }}</ei:reportType>
   {% include 'parts/reportDescriptionEmix.xml' %}
   <ei:readingType>{{ report_description.reading_type }}</ei:readingType>
