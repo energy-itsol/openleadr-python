@@ -110,7 +110,7 @@ class OpenADRClient:
         self.incomplete_reports = {}
         # Holds reports that are waiting to be sent
         self.pending_reports = asyncio.Queue()
-        self.job = Job(self.update_report)
+        self.job = Job(callback=self.update_report)
         self.client_session = None
         self.report_queue_task = None
 
@@ -217,7 +217,22 @@ class OpenADRClient:
         self.job.scheduler.add_job(self._event_cleanup,
                                    trigger='interval',
                                    seconds=300)
-        self.job.start()
+        await self.job.start()
+        from openleadr import db
+        results = db.load()
+        if results:
+            for result in results:
+                self.report_requests.append(
+                    {
+                        'report_request_id': result['report_request_id'],
+                        'report_specifier_id': result['report_specifier_id'],
+                        'report_back_duration': result['report_back_duration'],
+                        'report_interval': result['report_interval'],
+                        'r_ids': result['r_ids'].split(','),
+                        'granularity': result['granularity']
+                    })
+
+
 
     async def stop(self):
         """
@@ -576,17 +591,17 @@ class OpenADRClient:
                 result = await self.create_report(report_request)
 
         # Send the oadrCreatedReport message
-        message_type = 'oadrCreatedReport'
-        message_payload = {'pending_reports': [{'report_request_id': utils.getmember(
-            report, 'report_request_id')} for report in self.report_requests]}
-        message = self._create_message(
-            'oadrCreatedReport',
-            response={
-                'response_code': 200,
-                'response_description': 'OK'},
-            ven_id=self.ven_id,
-            **message_payload)
-        response_type, response_payload = await self._perform_request(service, message)
+        # message_type = 'oadrCreatedReport'
+        # message_payload = {'pending_reports': [{'report_request_id': utils.getmember(
+        #     report, 'report_request_id')} for report in self.report_requests]}
+        # message = self._create_message(
+        #     'oadrCreatedReport',
+        #     response={
+        #         'response_code': 200,
+        #         'response_description': 'OK'},
+        #     ven_id=self.ven_id,
+        #     **message_payload)
+        # response_type, response_payload = await self._perform_request(service, message)
 
     async def create_report(self, report_request):
         """
@@ -678,13 +693,13 @@ class OpenADRClient:
             'report_specifier_id': report_specifier_id,
             'report_back_duration': report_back_duration,
             'report_interval': report_interval,
-            'r_ids': requested_r_ids,
+            'r_ids': ','.join([str(x) for x in requested_r_ids]) ,
             'granularity': granularity,
             'start_datetime': report_interval['dtstart'],
-            'end_datetime': report_interval['dtstart'].timedelta(report_interval['duration'])
+            'end_datetime': report_interval['dtstart'] + utils.parse_duration(report_interval['duration'])
         }
         if report_back_duration != timedelta(seconds=0):
-            self.job.add(dataset=request, callback=callback)
+            self.job.add(dataset=request)
 
         self.report_requests.append(
             {
@@ -798,21 +813,24 @@ class OpenADRClient:
             logger.info("Report will be sent now.")
             await self.pending_reports.put(outgoing_report)
 
-    async def update_single_report(self, report_request):
+    async def update_single_report(self, report_request, request_id):
         """
         Create a single report in response to a request from the VTN.
         """
         # Send the oadrCreatedReport message
         service = 'EiReport'
-        message_payload = {'pending_reports': [{'report_request_id': utils.getmember(
-            report, 'report_request_id')} for report in self.reports]}
+
+        report_request_id = report_request['report_request_id']
+        message_payload = {'pending_reports': [{'report_request_id':report_request_id}]}
         message = self._create_message(
             'oadrCreatedReport',
             response={
                 'response_code': 200,
-                'response_description': 'OK'},
+                'response_description': 'OK',
+                'request_id': request_id},
             ven_id=self.ven_id,
             **message_payload)
+        service = 'EiReport'
         response_type, response_payload = await self._perform_request(service, message)
 
         await self.update_report_oneshot(report_request_id=report_request['report_request_id'])

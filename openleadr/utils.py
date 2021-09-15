@@ -461,7 +461,7 @@ def pop_by(list_, key, value, *args):
     return item
 
 
-def cron_config(interval, fixed_seconds="0", randomize_seconds=False):
+def cron_config(interval, fixed_seconds="20", randomize_seconds=False):
     """
     Returns a dict with cron settings for the given interval
     """

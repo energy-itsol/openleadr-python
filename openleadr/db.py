@@ -3,7 +3,8 @@ import os
 import pymysql.cursors
 import pymysqlpool
 
-from datetime import date, datetime
+from pytz import timezone
+from datetime import date, datetime, timedelta
 from logging import getLogger, root
 
 logger = getLogger("asr")
@@ -41,6 +42,15 @@ def load():
 
 
 def create(dict):
+    # convert jst
+    start_datetime= dict['start_datetime'].astimezone(timezone('Asia/Tokyo'))
+    end_datetime= dict['end_datetime'].astimezone(timezone('Asia/Tokyo'))
+    if dict['report_back_duration'] >= timedelta(days=1):
+        report_back_duration = f"{dict['report_back_duration'].days * 24}:00:00"
+    else:
+        report_back_duration = dict['report_back_duration']
+
+
     sql = ('''
       INSERT INTO jobs(
         report_request_id,
@@ -69,12 +79,13 @@ def create(dict):
         report_request_id=str(dict['report_request_id']),
         report_specifier_id=dict['report_specifier_id'],
         r_ids=dict['r_ids'],
-        report_back_duration=dict['report_back_duration'],
+        report_back_duration=report_back_duration,
         granularity=dict['granularity'],
-        report_interval=dict['report_interval'],
-        start_datetime=dict['start_datetime'],
-        end_datetime=dict['end_datetime'],
+        report_interval=dict['report_interval']['duration'],
+        start_datetime=start_datetime.strftime('%Y-%m-%d %H:%M:%S'),
+        end_datetime=end_datetime.strftime('%Y-%m-%d %H:%M:%S'),
         created_at=datetime.now())
+
     save(sql)
 
 

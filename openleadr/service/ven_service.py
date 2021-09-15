@@ -104,6 +104,9 @@ class VENService:
                 #         request)
                 response_type, response_payload = await self.handle_message(message_type,
                                                                             message_payload)
+                if not response_type:
+                    return
+
             except Exception as err:
                 logger.error(
                     "An exception occurred during the execution of your "

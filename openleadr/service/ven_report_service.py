@@ -90,8 +90,22 @@ class VENReportService(VENService):
         else:
             mode = 'full'
 
-        if payload['reports'] is None:
-            return
+        if not 'reports' in payload:
+            message_type = 'oadrRegisteredReport'
+            message_payload = {'report_requests':[]}
+
+            message = self._create_message(
+                message_type,
+                response={
+                    'response_code': 200,
+                    'response_description': 'OK',
+                    'request_id': payload['request_id']},
+                ven_id=self.ven_id,
+                **message_payload)
+            service = 'EiReport'
+
+            response_type, response_payload = await self.client._perform_request(service, message)
+            return response_type, response_payload
 
         for report in payload['reports']:
             if report['report_name'] == 'METADATA_TELEMETRY_STATUS':
@@ -258,9 +272,12 @@ class VENReportService(VENService):
         """
         Handle a report that we received from the VTN.
         """
+        request_id = report_request['request_id']
         if 'report_requests' in report_request:
+            report_request_ids = []
             for report_request in report_request['report_requests']:
                 report_specifier_id = report_request['report_specifier']['report_specifier_id']
+                report_request_ids.append({'report_request_id':report_request['report_request_id']})
                 cycle_grain = report_specifier_id.split('_')[-2]
                 if cycle_grain == "0001":
                     await self.client.create_report(report_request)
@@ -270,17 +287,18 @@ class VENReportService(VENService):
                         '-')[0], cycle_grain.split('-')[1]
                     if cycle == '00m':
                         await self.client.create_report(report_request)
-                        await self.client.update_single_report(report_request)
+                        await self.client.update_single_report(report_request, request_id)
+                        return None, None
                     else:
                         await self.client.create_report(report_request)
 
-            message_payload = {'pending_reports': [{'report_request_id': utils.getmember(
-                report, 'report_request_id')} for report in self.client.report_requests]}
+            message_payload = {'pending_reports': report_request_ids}
             message = self._create_message(
                 'oadrCreatedReport',
                 response={
                     'response_code': 200,
-                    'response_description': 'OK'},
+                    'response_description': 'OK',
+                    'request_id': request_id},
                 ven_id=self.ven_id,
                 **message_payload)
             service = 'EiReport'

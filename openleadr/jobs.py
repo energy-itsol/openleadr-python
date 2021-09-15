@@ -4,7 +4,7 @@ import time
 from datetime import datetime, timezone, timedelta
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-import db
+from openleadr import db
 from openleadr import utils
 import logging
 
@@ -25,24 +25,24 @@ class Job:
         scheduler_id = dataset['id']
         date_start_on = dataset['start_datetime']
         date_start_off = dataset['end_datetime']
-        duration = dataset['interval_minute']
+        duration = dataset['report_back_duration']
 
         scheduler_type = 'cron'
-        config = utils.cron_config(timedelta(minutes=duration))
+        config = utils.cron_config(utils.parse_duration(duration))
         args_on = dict(config, start_date=date_start_on, end_date=date_start_off)
 
-        callback = partial(
+        cb = partial(
             self.callback,
             report_request_id=dataset['report_request_id'])
 
-        self.scheduler.add_job(callback, scheduler_type,
-                               args=[scheduler_id],
+        self.scheduler.add_job(cb, scheduler_type,
                                id='%son' % scheduler_id, **args_on)
+        logger.info('add job' + str(args_on))
 
-    def add(self, dataset, callback):
+    def add(self, dataset):
         db.create(dataset)
         row = db.job_by_resource_id(dataset['report_specifier_id'], dataset['r_ids'])
-        self._add(row, callback)
+        self._add(row)
 
     def reload(self, scheduler_id):
         self.delete_job(scheduler_id)
