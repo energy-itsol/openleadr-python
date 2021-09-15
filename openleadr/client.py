@@ -373,7 +373,7 @@ class OpenADRClient:
             item_base = measurement
         elif isinstance(measurement, dict):
             utils.validate_report_measurement_dict(measurement)
-            power_attributes = object.PowerAttributes(
+            power_attributes = objects.PowerAttributes(
                 **measurement.get('power_attributes')) or None
             item_base = objects.Measurement(
                 name=measurement['name'],
