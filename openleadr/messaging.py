@@ -63,17 +63,17 @@ def create_message(message_type, cert=None, key=None, passphrase=None, **message
     template = TEMPLATES.get_template(f'{message_type}.xml')
     signed_object = utils.flatten_xml(template.render(**message_payload))
     envelope = TEMPLATES.get_template('oadrPayload.xml')
-    if cert and key:
-        tree = etree.fromstring(signed_object)
-        signature_tree = SIGNER.sign(tree,
-                                     key=key,
-                                     cert=cert,
-                                     passphrase=utils.ensure_bytes(passphrase),
-                                     reference_uri="#oadrSignedObject",
-                                     signature_properties=_create_replay_protect())
-        signature = etree.tostring(signature_tree).decode('utf-8')
-    else:
-        signature = None
+    # if cert and key:
+    #     tree = etree.fromstring(signed_object)
+    #     signature_tree = SIGNER.sign(tree,
+    #                                  key=key,
+    #                                  cert=cert,
+    #                                  passphrase=utils.ensure_bytes(passphrase),
+    #                                  reference_uri="#oadrSignedObject",
+    #                                  signature_properties=_create_replay_protect())
+    #     signature = etree.tostring(signature_tree).decode('utf-8')
+    # else:
+    signature = None
 
     msg = envelope.render(template=f'{message_type}',
                           signature=signature,
