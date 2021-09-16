@@ -9,7 +9,6 @@
     <oadr:oadrTransportAddress>{{ transport_address }}</oadr:oadrTransportAddress>
     <oadr:oadrReportOnly>{{ report_only|booleanformat }}</oadr:oadrReportOnly>
     <oadr:oadrXmlSignature>{{ xml_signature|booleanformat }}</oadr:oadrXmlSignature>
-    <oadr:oadrVenName>{{ ven_name }}</oadr:oadrVenName>
     <oadr:oadrHttpPullModel>{{ http_pull_model|booleanformat }}</oadr:oadrHttpPullModel>
   </oadr:oadrCreatePartyRegistration>
 </oadr:oadrSignedObject>
