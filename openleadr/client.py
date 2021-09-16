@@ -160,11 +160,6 @@ class OpenADRClient:
             await self.stop()
             return
 
-        if self.reports:
-            await self.register_reports(self.reports)
-            self.report_queue_task = self.loop.create_task(
-                self._report_queue_worker())
-
         # pull �̏ꍇ�̂݁Apolling ���N������(push �̏ꍇ�́A�s�v)
         if self.http_pull_model:
             await self._poll()
@@ -213,6 +208,11 @@ class OpenADRClient:
 
             VENService._create_message = partial(
                 create_message, cert=None, key=None, passphrase=None)
+
+        if self.reports:
+            await self.register_reports(self.reports)
+            self.report_queue_task = self.loop.create_task(
+                self._report_queue_worker())
 
         self.job.scheduler.add_job(self._event_cleanup,
                                    trigger='interval',
