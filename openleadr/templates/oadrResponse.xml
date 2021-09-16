@@ -4,9 +4,9 @@
       <ei:responseCode>{{ response.response_code }}</ei:responseCode>
       <ei:responseDescription>{{ response.response_description }}</ei:responseDescription>
       {% if response.request_id is defined and response.request_id is not none %}
-      <requestID xmlns="http://docs.oasis-open.org/ns/energyinterop/201110/payloads">{{ response.request_id }}</requestID>
+      <pyld:requestID xmlns="http://docs.oasis-open.org/ns/energyinterop/201110/payloads">{{ response.request_id }}</pyld:requestID>
       {% else %}
-      <requestID xmlns="http://docs.oasis-open.org/ns/energyinterop/201110/payloads" />
+      <pyld:requestID xmlns="http://docs.oasis-open.org/ns/energyinterop/201110/payloads" />
       {% endif %}
     </ei:eiResponse>
     <ei:venID>{{ ven_id }}</ei:venID>

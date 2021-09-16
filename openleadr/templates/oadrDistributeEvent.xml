@@ -4,10 +4,10 @@
     <ei:eiResponse>
       <ei:responseCode>{{ response.response_code }}</ei:responseCode>
       <ei:responseDescription>{{ response.response_description }}</ei:responseDescription>
-      <requestID xmlns="http://docs.oasis-open.org/ns/energyinterop/201110/payloads">{{ response.request_id }}</requestID>
+      <pyld:requestID xmlns="http://docs.oasis-open.org/ns/energyinterop/201110/payloads">{{ response.request_id }}</pyld:requestID>
     </ei:eiResponse>
     {% endif %}
-    <requestID xmlns="http://docs.oasis-open.org/ns/energyinterop/201110/payloads">{{ request_id }}</requestID>
+    <pyld:requestID xmlns="http://docs.oasis-open.org/ns/energyinterop/201110/payloads">{{ request_id }}</pyld:requestID>
     <ei:vtnID>{{ vtn_id }}</ei:vtnID>
     {% for event in events %}
         {% include 'parts/eiEvent.xml' %}

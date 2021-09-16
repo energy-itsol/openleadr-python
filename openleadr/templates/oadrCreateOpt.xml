@@ -11,7 +11,7 @@
     <xcal:vavailability></xcal:vavailability>
     {% endif %}
     <ei:createdDateTime>{{ created_date_time|datetimeformat }} </ei:createdDateTime>
-    <requestID xmlns="http://docs.oasis-open.org/ns/energyinterop/201110/payloads">{{ request_id }}</requestID>
+    <pyld:requestID xmlns="http://docs.oasis-open.org/ns/energyinterop/201110/payloads">{{ request_id }}</pyld:requestID>
     <ei:qualifiedEventID>
       <ei:eventID>{{ event_id }}</ei:eventID>
       <ei:modificationNumber>{{ modification_number }}</ei:modificationNumber>
